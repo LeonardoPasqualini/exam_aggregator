@@ -1,27 +1,33 @@
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 
 app = FastAPI()
 
 exams: list[dict] = [
         {
             "id": 1,
-            "group": "Hematologia",
-            "type": "Hemograma",
-            "name": "Eritrócitos",
-            "owner": "Leonardo Carvalho",
+            "area": "Hematologia",
+            "exam": "Hemograma",
+            "secction": "Eritrograma",
+            "parameter": "Eritrócito",
+            "owner": "John Smith",
+            "unity": "10^12/l",
             "ref_min": 4.30,
             "ref_max": 6.30,
             "result": 5.55,
-            "unity": "10^12/l",
             "date": "28/07/2026"
         },
         {
             "id": 2,
-            "group": "Hematologia",
-            "type": "Hemograma",
-            "name": "Hemoglobina",
-            "owner": "Leonardo Carvalho",
+            "area": "Hematologia",
+            "exam": "Hemograma",
+            "secction": "Eritrograma",
+            "parameter": "Hemoglobina",
+            "owner": "John Smith",
+            "unity": "g/dl",
             "ref_min": 13.0,
             "ref_max": 16.5,
             "result": 16.0,
@@ -47,3 +53,39 @@ def get_exams(exam_id: int):
         if exam.get("id") == exam_id:
             return exam
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+# Exception handlers
+# catches StarletteHTTPException and reponds with JSONResponse
+@app.exception_handler(StarletteHTTPException)
+def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
+    message: str = (
+        exception.detail
+        if exception.detail
+        else "An error ocurred. Plese check your request and try again"
+    )
+    # Respond in JSON if its API or other way if not
+    if request.url.path.startswith("/api"):
+        return JSONResponse(
+            status_code=exception.status_code,
+            content={"detail": message},
+        )
+    # Here goes a response diferent from JSON, like a temple
+    return JSONResponse(
+                status_code=exception.status_code,
+                content={"detail": "fell into not JSON response"},
+            )
+
+# catches RequestValidationError and reponds with JSONResponse
+@app.exception_handler(RequestValidationError)
+def general_http_exception_handler(request: Request, exception: RequestValidationError):
+    # Respond in JSON if its API or other way if not
+    if request.url.path.startswith("/api"):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": exception.errors()},
+        )
+    # Here goes a response diferent from JSON, like a temple
+    return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                content={"detail": "fell into not JSON response"},
+            )
