@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from datetime import datetime
+
+from schemas import ExamCreate, ExamResponse
 
 
 app = FastAPI()
@@ -42,17 +45,41 @@ def home():
     # fastAPI converts dict in json automaticaly
     return f"<h1>{exams[0]["name"]}</h1>"
 
-@app.get("/api/exams")
+@app.get("/api/exams", response_model=list[ExamResponse])
 def get_exams():
-    # fastAPI converts dict in json automaticaly
+    # fastAPI converts dict into json automaticaly
     return exams
 
-@app.get("/api/exam/{exam_id}")
+@app.get("/api/exam/{exam_id}", response_model=ExamResponse)
 def get_exams(exam_id: int):
     for exam in exams:
         if exam.get("id") == exam_id:
             return exam
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+@app.post(
+    "/api/exams",
+    response_model=ExamResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def creat_exam(exam: ExamCreate):
+    new_id = max(e["id"] for e in exams) + 1 if exams else 1
+    new_exam = {
+        "id": new_id,
+        "area": exam.area,
+        "exam": exam.exam,
+        "secction": exam.secction,
+        "parameter": exam.parameter,
+        "unity": exam.unity,
+        "ref_min": exam.ref_min,
+        "ref_max": exam.ref_max,
+        "result": exam.result,
+        "date": "date here"
+    }
+    
+    exams.append(new_exam)
+    
+    return new_exam
 
 # Exception handlers
 # catches StarletteHTTPException and reponds with JSONResponse
