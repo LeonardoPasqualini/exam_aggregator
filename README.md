@@ -1,5 +1,5 @@
 # Introduction
-This repository is made as a way to learn about Python, FastAPI and other libraries. It is a simple API that allows you to create, read, update and delete biological exams like blood works.
+This repository is made as a way to learn about Python, FastAPI and other libraries. It is a simple API that allows you to create, read, update and delete laboratorial exams like blood works.
 
 ## For Boot.dev
 As an alumni of [Boot.dev](https://www.boot.dev), I am using this repository to complet the personal project in the Backend path.
