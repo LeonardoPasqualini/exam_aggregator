@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 import models
 from database import Base, engine, get_db
-from schemas import ExamCreate, ExamResponse, UserCreate, UserResponse
+from schemas import ExamCreate, ExamResponse, ExamUpdate, UserCreate, UserResponse, UserUpdate
 
 # Create tables if it doesn't exist
 Base.metadata.create_all(bind=engine)
@@ -124,6 +124,75 @@ def get_user_exams(user_id: int, db: Annotated[Session, Depends(get_db)]):
     exams = result.scalars().all()
     return exams
 
+@app.patch("/api/user/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Annotated[Session, Depends(get_db)]
+):
+    #check if user exists before try to fetch its exams
+    result = db.execute(
+        select(models.User).where(models.User.id == user_id),
+    )
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found",
+        )
+    
+    # Check if username alredy exists
+    if user_update.username is not None and user_update.username != user.username:
+        result = db.execute (
+            select(models.User).where(models.User.username == user_update.username),
+        )
+        existing_user = result.scalars().first()
+        if existing_user:
+            raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, 
+                        detail="Username already exists",
+                    )
+    # Check if e-mail alredy exists
+    if user_update.email is not None and user_update.email != user.email:
+            result = db.execute (
+                select(models.User).where(models.User.email == user_update.email),
+            )
+            existing_email = result.scalars().first()
+            if existing_email:
+                raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST, 
+                            detail="Email already exists",
+                        )
+    
+    if user_update.username is not None:
+        user.username = user_update.username
+    if user_update.email is not None:
+            user.email = user_update.email
+            
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/api/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    #check if user exists before try to fetch its exams
+    result = db.execute(
+        select(models.User).where(models.User.id == user_id),
+    )
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found",
+        )
+
+    db.delete(user)
+    db.commit()
+    
+
 ############################################################
 ######################## Exam's API ########################
 ############################################################
@@ -136,7 +205,7 @@ def get_exams(db: Annotated[Session, Depends(get_db)]):
     return exams
 
 @app.get("/api/exam/{exam_id}", response_model=ExamResponse)
-def get_exams(exam_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(
         select(models.Exam).where(models.Exam.id == exam_id),
     )
@@ -148,7 +217,87 @@ def get_exams(exam_id: int, db: Annotated[Session, Depends(get_db)]):
         )
     
     return exam
+
+@app.put("/api/exam/{exam_id}", response_model=ExamResponse)
+def update_exam_full(exam_id: int,
+             exam_data: ExamCreate,
+             db: Annotated[Session, Depends(get_db)]
+            ):
+    result = db.execute(
+        select(models.Exam).where(models.Exam.id == exam_id),
+    )
+    exam = result.scalars().first()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found",
+        )
     
+    if exam_data.user_id != exam.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Users do not match",
+        )
+    
+    exam.area = exam_data.area
+    exam.test = exam_data.test
+    exam.secction = exam_data.secction
+    exam.parameter = exam_data.parameter
+    exam.unity = exam_data.unity
+    exam.ref_min = exam_data.ref_min
+    exam.ref_max = exam_data.ref_max
+    exam.result = exam_data.result
+    exam.date_exam = exam_data.date_exam
+    exam.user_id = exam_data.user_id
+    
+    db.commit()
+    db.refresh(exam)
+    
+    return exam
+
+@app.patch("/api/exam/{exam_id}", response_model=ExamResponse)
+def update_exam_partial(
+    exam_id: int,
+    exam_data: ExamUpdate,
+    db: Annotated[Session, Depends(get_db)]
+):
+    result = db.execute(
+        select(models.Exam).where(models.Exam.id == exam_id),
+    )
+    exam = result.scalars().first()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found",
+        )
+    
+    # model_dump return a convertion dict from json
+    # Exclude fields that aren't set
+    update_data = exam_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        # setattr is a Python built-in function
+        setattr(exam, field, value)
+    
+    
+    db.commit()
+    db.refresh(exam)
+    
+    return exam
+    
+@app.delete("/api/exam/{exam_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(models.Exam).where(models.Exam.id == exam_id),
+    )
+    exam = result.scalars().first()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found",
+        )
+    # exam ownership will come soon
+    db.delete(exam)
+    db.commit()
 
 @app.post(
     "/api/exams",

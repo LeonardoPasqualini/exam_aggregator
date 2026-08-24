@@ -9,6 +9,10 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     pass
 
+class UserUpdate(BaseModel):
+    username: str | None = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr | None = Field(default=None, max_length=120)
+
 class UserResponse(UserBase):
     # allows pydantic to read dot notation, used with
     # models comming from the database
@@ -29,10 +33,21 @@ class ExamBase(BaseModel):
     ref_max: float = Field(ge=1)
     result: float = Field(ge=1)
     # date: datetime | None = None
-    date_exam: datetime = Field(default_factory=datetime.now)
+    date_exam: datetime
     
 class ExamCreate(ExamBase):
     user_id: int # TEMPORARY
+    
+class ExamUpdate(BaseModel):
+    area: str | None = Field(default=None, min_length=3, max_length=50)
+    test: str | None = Field(default=None, min_length=3, max_length=50)
+    secction: str | None = Field(default=None, min_length=3, max_length=50)
+    parameter: str | None = Field(default=None, min_length=3, max_length=50)
+    unity: str | None = Field(default=None, min_length=1, max_length=20)
+    ref_min: float | None = Field(default=None, ge=1)
+    ref_max: float | None = Field(default=None, ge=1)
+    result: float | None = Field(default=None, ge=1)
+    date_exam: datetime | None = Field(default=None)
 
 class ExamResponse(ExamBase):
     # allows pydantic to read dot notation, used with
@@ -43,7 +58,7 @@ class ExamResponse(ExamBase):
     
     id: int
     user_id: int
-    # created_at: datetime
+    created_at: datetime = Field(default_factory=datetime.now)
     owner: UserResponse
     
 # print(ExamCreate.model_dump_json(ident=2, exclude={some_field}))

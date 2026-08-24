@@ -25,7 +25,10 @@ class User(Base):
     # One to many
     # Backpopulates is used to link to the owner of the exam
     # Allows user.exams for exemple.
-    exams: Mapped[list[Exam]] = relationship(back_populates="owner")
+    exams: Mapped[list[Exam]] = relationship(
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
     
     # @property
     # def image_path(self) -> str:
