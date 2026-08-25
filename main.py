@@ -1,23 +1,39 @@
+from contextlib import asynccontextmanager
 # type safe dependecies
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request, status, Depends
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 import models
 from database import Base, engine, get_db
 from schemas import ExamCreate, ExamResponse, ExamUpdate, UserCreate, UserResponse, UserUpdate
 
-# Create tables if it doesn't exist
-Base.metadata.create_all(bind=engine)
+## Create tables if it doesn't exist
+## removed for async update
+# Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+# Create tables if it doesn't exist async
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Shutdown
+    await engine.dispose()
+
+app = FastAPI(lifespan=lifespan)
 
 # # create /static url prefix to serve files from the directory
 # app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -26,8 +42,10 @@ app = FastAPI()
 # Example of a HTMLResponse
 @app.get("/", response_class=HTMLResponse, include_in_schema=False, name="home")
 @app.get("/exams", response_class=HTMLResponse, include_in_schema=False, name="exams")
-def home(request: Request, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(models.Exam))
+async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
+        select(models.Exam).options(selectinload(models.Exam.owner)),
+    )
     exams = result.scalars().all()
     ## fastAPI converts dict in json automaticaly
     # return f"<h1>{exams[0]["name"]}</h1>"
@@ -47,9 +65,9 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
 )
 # The get_db injection asks for a session and pass the result to db.
 # This happens before the Annotated execution
-def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+async def create_user(user: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     # check if the username exist in the db
-    result = db.execute(
+    result = await db.execute(
         select(models.User).where(models.User.username == user.username),
     )
     # gets the first user object or None if no match found
@@ -63,7 +81,7 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
         )
     
     # check if the email exist in the db
-    result = db.execute(
+    result = await db.execute(
         select(models.User).where(models.User.email == user.email),
     )
     # gets the first user object or None if no match found
@@ -81,22 +99,23 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
         email=user.email
     )
     
+    # add the object to the session 
+    # it's not a db opperation
     db.add(new_user)
-    db.commit()
+    await db.commit()
     # SQLAlchemy maybe alredy track the auto generated ID and relationships.
     # but it is a good habit for server side defaults and triggers
-    db.refresh(new_user)
+    await db.refresh(new_user)
     
     return new_user
 
 @app.get("/api/user/{user_id}", response_model=UserResponse)
-def get_users(user_id: int, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(
+async def get_users(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
         select(models.User).where(models.User.id == user_id),
     )
     
     user = result.scalars().first()
-    
     if user:
         return user
     
@@ -106,9 +125,9 @@ def get_users(user_id: int, db: Annotated[Session, Depends(get_db)]):
     )
 
 @app.get("/api/user/{user_id}/exams", response_model=list[ExamResponse])
-def get_user_exams(user_id: int, db: Annotated[Session, Depends(get_db)]):
+async def get_user_exams(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
     #check if user exists before try to fetch its exams
-    result = db.execute(
+    result = await db.execute(
         select(models.User).where(models.User.id == user_id),
     )
     user = result.scalars().first()
@@ -120,18 +139,21 @@ def get_user_exams(user_id: int, db: Annotated[Session, Depends(get_db)]):
     
     #fetch user's exams
     
-    result = db.execute(select(models.Exam).where(models.Exam.user_id == user_id))
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+        .where(models.Exam.user_id == user_id))
     exams = result.scalars().all()
     return exams
 
 @app.patch("/api/user/{user_id}", response_model=UserResponse)
-def update_user(
+async def update_user(
     user_id: int,
     user_update: UserUpdate,
-    db: Annotated[Session, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     #check if user exists before try to fetch its exams
-    result = db.execute(
+    result = await db.execute(
         select(models.User).where(models.User.id == user_id),
     )
     user = result.scalars().first()
@@ -143,8 +165,9 @@ def update_user(
     
     # Check if username alredy exists
     if user_update.username is not None and user_update.username != user.username:
-        result = db.execute (
-            select(models.User).where(models.User.username == user_update.username),
+        result = await db.execute (
+            select(models.User)
+            .where(models.User.username == user_update.username),
         )
         existing_user = result.scalars().first()
         if existing_user:
@@ -154,8 +177,9 @@ def update_user(
                     )
     # Check if e-mail alredy exists
     if user_update.email is not None and user_update.email != user.email:
-            result = db.execute (
-                select(models.User).where(models.User.email == user_update.email),
+            result = await db.execute (
+                select(models.User)
+                .where(models.User.email == user_update.email),
             )
             existing_email = result.scalars().first()
             if existing_email:
@@ -169,17 +193,17 @@ def update_user(
     if user_update.email is not None:
             user.email = user_update.email
             
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 @app.delete("/api/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(
+async def delete_user(
     user_id: int,
-    db: Annotated[Session, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     #check if user exists before try to fetch its exams
-    result = db.execute(
+    result = await db.execute(
         select(models.User).where(models.User.id == user_id),
     )
     user = result.scalars().first()
@@ -188,9 +212,10 @@ def delete_user(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="User not found",
         )
-
-    db.delete(user)
-    db.commit()
+    # the way delete interact with the section
+    # needs await
+    await db.delete(user)
+    await db.commit()
     
 
 ############################################################
@@ -198,16 +223,21 @@ def delete_user(
 ############################################################
 
 @app.get("/api/exams", response_model=list[ExamResponse])
-def get_exams(db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(models.Exam))
+async def get_exams(db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+    )
     exams = result.scalars().all()
     # fastAPI converts dict into json automaticaly
     return exams
 
 @app.get("/api/exam/{exam_id}", response_model=ExamResponse)
-def get_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(
-        select(models.Exam).where(models.Exam.id == exam_id),
+async def get_exam(exam_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+        .where(models.Exam.id == exam_id),
     )
     exam = result.scalars().first()
     if not exam:
@@ -219,12 +249,14 @@ def get_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
     return exam
 
 @app.put("/api/exam/{exam_id}", response_model=ExamResponse)
-def update_exam_full(exam_id: int,
+async def update_exam_full(exam_id: int,
              exam_data: ExamCreate,
-             db: Annotated[Session, Depends(get_db)]
+             db: Annotated[AsyncSession, Depends(get_db)]
             ):
-    result = db.execute(
-        select(models.Exam).where(models.Exam.id == exam_id),
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+        .where(models.Exam.id == exam_id),
     )
     exam = result.scalars().first()
     if not exam:
@@ -250,19 +282,21 @@ def update_exam_full(exam_id: int,
     exam.date_exam = exam_data.date_exam
     exam.user_id = exam_data.user_id
     
-    db.commit()
-    db.refresh(exam)
+    await db.commit()
+    await db.refresh(exam, attribute_names=["owner"])
     
     return exam
 
 @app.patch("/api/exam/{exam_id}", response_model=ExamResponse)
-def update_exam_partial(
+async def update_exam_partial(
     exam_id: int,
     exam_data: ExamUpdate,
-    db: Annotated[Session, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    result = db.execute(
-        select(models.Exam).where(models.Exam.id == exam_id),
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+        .where(models.Exam.id == exam_id),
     )
     exam = result.scalars().first()
     if not exam:
@@ -279,15 +313,17 @@ def update_exam_partial(
         setattr(exam, field, value)
     
     
-    db.commit()
-    db.refresh(exam)
+    await db.commit()
+    await db.refresh(exam, attribute_names=["owner"])
     
     return exam
     
 @app.delete("/api/exam/{exam_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(
-        select(models.Exam).where(models.Exam.id == exam_id),
+async def delete_exam(exam_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
+        select(models.Exam)
+        .options(selectinload(models.Exam.owner))
+        .where(models.Exam.id == exam_id),
     )
     exam = result.scalars().first()
     if not exam:
@@ -296,17 +332,19 @@ def delete_exam(exam_id: int, db: Annotated[Session, Depends(get_db)]):
             detail="Exam not found",
         )
     # exam ownership will come soon
-    db.delete(exam)
-    db.commit()
+    await db.delete(exam)
+    await db.commit()
 
 @app.post(
     "/api/exams",
     response_model=ExamResponse,
     status_code=status.HTTP_201_CREATED
 )
-def creat_exam(exam: ExamCreate, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(
-            select(models.User).where(models.User.id == exam.user_id),
+async def creat_exam(exam: ExamCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(
+            select(models.User)
+            .options(selectinload(models.Exam.owner))
+            .where(models.User.id == exam.user_id),
         )
     user = result.scalars().first()
     if not user:
@@ -329,8 +367,9 @@ def creat_exam(exam: ExamCreate, db: Annotated[Session, Depends(get_db)]):
     )
     
     db.add(new_exam)
-    db.commit()
-    db.refresh(new_exam)
+    await db.commit()
+    # refresh the exam and load the owner relationship
+    await db.refresh(new_exam, attribute_names=["owner"])
     
     return new_exam
 
@@ -342,19 +381,22 @@ def creat_exam(exam: ExamCreate, db: Annotated[Session, Depends(get_db)]):
 
 # catches StarletteHTTPException and reponds with JSONResponse
 @app.exception_handler(StarletteHTTPException)
-def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
-    message: str = (
-        exception.detail
-        if exception.detail
-        else "An error ocurred. Plese check your request and try again"
-    )
+async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
+    # message: str = (
+    #     exception.detail
+    #     if exception.detail
+    #     else "An error ocurred. Plese check your request and try again"
+    # )
     # Respond in JSON if its API or other way if not
     if request.url.path.startswith("/api"):
-        return JSONResponse(
-            status_code=exception.status_code,
-            content={"detail": message},
-        )
-    # Here goes a response diferent from JSON, like a temple
+        # return JSONResponse(
+        #     status_code=exception.status_code,
+        #     content={"detail": message},
+        # )
+        
+        # with async it's better let Fast API handle the error
+        return await http_exception_handler(request, exception)
+    # Here goes a response diferent from JSON, like a templete route
     return JSONResponse(
                 status_code=exception.status_code,
                 content={"detail": "fell into not JSON response"},
@@ -362,13 +404,14 @@ def general_http_exception_handler(request: Request, exception: StarletteHTTPExc
 
 # catches RequestValidationError and reponds with JSONResponse
 @app.exception_handler(RequestValidationError)
-def general_http_exception_handler(request: Request, exception: RequestValidationError):
+async def general_http_exception_handler(request: Request, exception: RequestValidationError):
     # Respond in JSON if its API or other way if not
     if request.url.path.startswith("/api"):
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={"detail": exception.errors()},
-        )
+        # return JSONResponse(
+        #     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        #     content={"detail": exception.errors()},
+        # )
+        return await request_validation_exception_handler(request, exception)
     # Here goes a response diferent from JSON, like a temple
     return JSONResponse(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
