@@ -31,5 +31,5 @@ class Base(DeclarativeBase):
 # Dependecy function to prived sessions to the routes
 # Generates a new session for each request
 async def get_db():
-    with AsyncSessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         yield session

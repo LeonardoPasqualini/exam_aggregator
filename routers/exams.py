@@ -55,6 +55,7 @@ async def get_exams(db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(models.Exam)
         .options(selectinload(models.Exam.owner))
+        .order_by(models.Exam.date_exam.desc()),
     )
     exams = result.scalars().all()
     # fastAPI converts dict into json automaticaly
