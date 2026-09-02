@@ -44,7 +44,7 @@ class ExamBase(BaseModel):
     date_exam: datetime
     
 class ExamCreate(ExamBase):
-    user_id: int # TEMPORARY
+    pass
     
 class ExamUpdate(BaseModel):
     area: str | None = Field(default=None, min_length=3, max_length=50)
