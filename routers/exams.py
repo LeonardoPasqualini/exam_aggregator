@@ -1,13 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from PIL import UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 import models
 from auth import CurrentUser
+from config import settings
 from database import get_db
+from image_utils import delete_image, process_image
 from schemas import ExamResponse, ExamCreate, ExamResponse, ExamUpdate
 
 router = APIRouter()
@@ -169,7 +173,109 @@ async def delete_exam(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this exam",
         )
+    old_filename = exam.image_file
+    
     # exam ownership will come soon
     await db.delete(exam)
     await db.commit()
+    
+    if old_filename:
+        delete_image(old_filename)
 
+
+######## UPLOADS ##########
+
+@router.patch("/{exam.id}/image", response_model=ExamResponse)
+async def upload_exam_image(
+    exam_id: int,
+    file: UploadFile,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(
+            select(models.Exam)
+            .options(selectinload(models.Exam.owner))
+            .where(models.Exam.id == exam_id),
+        )
+    exam = result.scalars().first()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found",
+        )
+    
+    if exam.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this exam",
+        )
+    
+    content = await file.read()
+    # file.size is not always reliable
+    # use len to get the size
+    if len(content) > settings.max_upload_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Maximum size {settings.max_upload_size_bytes // (1024*1024)}MB"
+        )
+        
+    try:
+        # Wrap the CPU bound process in a thread
+        new_filename = await run_in_threadpool(process_image, content)
+    except UnidentifiedImageError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid image file. Plese upload a valid image (JPEG, PNG, GIF, WebP)"
+        ) from err
+    
+    old_filename = exam.image_file
+    
+    exam.image_file = new_filename
+    await db.commit()
+    await db.refresh(exam)
+    
+    # delete only if the commit succeeds
+    if old_filename:
+        delete_image(old_filename)
+    
+    return current_user
+
+@router.delete("/{exam_id}/image", response_model=ExamResponse)
+async def delete_exam_image(
+    exam_id: int,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    result = await db.execute(
+                select(models.Exam)
+                .options(selectinload(models.Exam.owner))
+                .where(models.Exam.id == exam_id),
+            )
+    exam = result.scalars().first()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found",
+        )
+    
+    if exam.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this exam",
+        )
+        
+    old_filename = exam.image_file
+    
+    if old_filename is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No image to delete",
+        )
+
+    exam.image_file = None
+    await db.commit()
+    await db.refresh(exam)
+    
+    delete_image(old_filename)
+    
+    return exam

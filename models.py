@@ -16,12 +16,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
-    # Will be used in the future
-    # image_file: Mapped[str | None] = mapped_column(
-    #     String(200), 
-    #     nullable=True,
-    #     default=None
-    # )
+    
     
     # One to many
     # Backpopulates is used to link to the owner of the exam
@@ -30,12 +25,7 @@ class User(Base):
         back_populates="owner",
         cascade="all, delete-orphan",
     )
-    
-    # @property
-    # def image_path(self) -> str:
-    #     if self.image_file:
-    #         return f"/media/profile_pics/{self.image_file}"
-    #     return "/static/profile_pics/default.jpg"
+
     
 class Exam(Base):
     __tablename__ = "exams"
@@ -49,6 +39,11 @@ class Exam(Base):
     ref_min: Mapped[float] = mapped_column(Float, nullable=True)
     ref_max: Mapped[float] = mapped_column(Float, nullable=True)
     result: Mapped[float] = mapped_column(Float, nullable=False)
+    image_file: Mapped[str | None] = mapped_column(
+            String(200), 
+            nullable=True,
+            default=None
+        )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
@@ -57,15 +52,14 @@ class Exam(Base):
     )
     date_exam: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        # default=lambda: datetime.now(UTC),
     )
     
     # Many to One
     # Backpopulates is used to link to the owner of the exam
     owner: Mapped[User] = relationship(back_populates="exams")
     
-    # @property
-    # def image_path(self) -> str:
-    #     if self.image_file:
-    #         return f"/media/profile_pics/{self.image_file}"
-    #     return "/static/profile_pics/default.jpg"
+    @property
+    def image_path(self) -> str | None:
+        if self.image_file:
+            return f"/media/exams/{self.image_file}"
+        return None
