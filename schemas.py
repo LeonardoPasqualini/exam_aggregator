@@ -68,3 +68,10 @@ class ExamResponse(ExamBase):
     owner: UserPublic
     
 # print(ExamCreate.model_dump_json(ident=2, exclude={some_field}))
+
+class PaginatedExamsResponse(BaseModel):
+    exams: list[ExamResponse]
+    total: int # total count in db
+    skip: int # current offset
+    limit: int # how many exams per request
+    has_more: bool # is ther more exams after this batch?

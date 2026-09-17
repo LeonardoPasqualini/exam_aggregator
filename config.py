@@ -13,4 +13,6 @@ class Settings(BaseSettings):
 
     max_upload_size_bytes: int = 5 * 1024 * 1024 # 5MB
     
+    exams_per_page: int = 10
+    
 settings = Settings() # Loadade from .env file

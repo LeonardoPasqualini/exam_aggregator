@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Query, status
 from PIL import UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -12,7 +12,7 @@ from auth import CurrentUser
 from config import settings
 from database import get_db
 from image_utils import delete_image, process_image
-from schemas import ExamResponse, ExamCreate, ExamResponse, ExamUpdate
+from schemas import ExamResponse, ExamCreate, ExamResponse, ExamUpdate, PaginatedExamsResponse
 
 router = APIRouter()
 
@@ -46,17 +46,39 @@ async def create_exam(
     
     return new_exam
 
-
-@router.get("", response_model=list[ExamResponse])
-async def get_exams(db: Annotated[AsyncSession, Depends(get_db)]):
+# The route get all exams. It wont be used in the future
+@router.get("", response_model=PaginatedExamsResponse)
+async def get_exams(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.exams_per_page,
+):
+    # count all the users exams of database
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(models.Exam)
+    )
+    total = count_result.scalar() or 0
+    
     result = await db.execute(
         select(models.Exam)
         .options(selectinload(models.Exam.owner))
-        .order_by(models.Exam.date_exam.desc()),
+        .order_by(models.Exam.date_exam.desc())
+        .offset(skip) # skip that many rows
+        .limit(limit), # return at most limit exams
     )
     exams = result.scalars().all()
     # fastAPI converts dict into json automaticaly
-    return exams
+    
+    has_more = skip + len(exams) < total
+    
+    return PaginatedExamsResponse(
+        exams=[ExamResponse.model_validate(exam) for exam in exams],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more
+    )
 
 @router.get("/{exam_id}", response_model=ExamResponse)
 async def get_exam(exam_id: int, db: Annotated[AsyncSession, Depends(get_db)]):

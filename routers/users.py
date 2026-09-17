@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from auth import (
 )
 from config import settings
 from database import get_db
-from schemas import ExamResponse, UserCreate, UserUpdate, UserPrivate, UserPublic, Token
+from schemas import ExamResponse, PaginatedExamsResponse, UserCreate, UserUpdate, UserPrivate, UserPublic, Token
 
 router = APIRouter()
 
@@ -129,8 +129,13 @@ async def get_users(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
         detail="User not found",
     )
 
-@router.get("/{user_id}/exams", response_model=list[ExamResponse])
-async def get_user_exams(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+@router.get("/{user_id}/exams", response_model=PaginatedExamsResponse)
+async def get_user_exams(
+    user_id: int, 
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.exams_per_page
+):
     #check if user exists before try to fetch its exams
     result = await db.execute(
         select(models.User).where(models.User.id == user_id),
@@ -144,14 +149,31 @@ async def get_user_exams(user_id: int, db: Annotated[AsyncSession, Depends(get_d
     
     #fetch user's exams
     
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(models.Exam)
+        .where(models.Exam.user_id == user_id),
+    )
+    
+    total = count_result.scalar() or 0
+    
     result = await db.execute(
         select(models.Exam)
         .options(selectinload(models.Exam.owner))
         .where(models.Exam.user_id == user_id)
         .order_by(models.Exam.date_exam.desc())
+        .offset(skip)
+        .offset(limit),
     )
     exams = result.scalars().all()
-    return exams
+    has_more = skip + len(exams) < total
+    return PaginatedExamsResponse(
+        exams=[ExamResponse.model_validate(exam) for exam in exams],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more
+    )
 
 @router.patch("/{user_id}", response_model=UserPrivate)
 async def update_user(
