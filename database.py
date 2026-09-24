@@ -1,16 +1,21 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
+from config import settings
+
 # the "+aiosqlite" tells the database which drive to use
 # for async process
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./exam_agreggator.db"
+# SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./exam_agreggator.db"
 
 engine = create_async_engine(
-    SQLALCHEMY_DATABASE_URL,
+    # connect to postgress
+    settings.database_url
+    
+    # SQLALCHEMY_DATABASE_URL,
     # check_same_thread:false is specific for SQLite,
     # it allows multiple threads to use the same connection.
     # For PostGRESQL, this is not necessary.
-    connect_args={"check_same_thread": False},
+    # connect_args={"check_same_thread": False},
 )
 
 # Factory for creating new database Session objects

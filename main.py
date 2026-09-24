@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import models
-from database import Base, engine, get_db
+from database import engine, get_db
 
 from routers import exams, users
 
@@ -28,8 +28,11 @@ from routers import exams, users
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # async with engine.begin() as conn:
+        # create_all looks to the models 
+        # and crate tables if not exists, even if it has changes
+        # it's not a migration
+        # await conn.run_sync(Base.metadata.create_all)
     yield
     # Shutdown
     await engine.dispose()

@@ -6,6 +6,8 @@ class Settings(BaseSettings):
         env_file=".env", # relative from your app is runnig
         env_file_encoding="utf-8",
     )
+    # set in the .env
+    database_url: str
     
     secret_key: SecretStr
     algorithm: str = "HS256" # standard for JWT

@@ -7,5 +7,24 @@ As an alumni of [Boot.dev](https://www.boot.dev), I am using this repository to 
 ## For FastAPI
 This project is based on the [FastAPI](https://fastapi.tiangolo.com/) framework. I am learning this framework by following - with adaptations - the [tutotiral of Corey Schafer](https://www.youtube.com/playlist?list=PL-osiE80TeTsak-c-QsVeg0YYG_0TeyXI) on YouTube.
 
-### Database
-The database used is SQLite, and the ORM used is SQLAlchemy. The database is created automatically when the application starts. I chose this way for now as a form of study and to complet the Boot.dev project. As the project grows, I will consider using a more robust database like PostgreSQL.
+## Database
+The database used is PostgreSQL, the ORM used is SQLAlchemy and alembic as the migration controller.
+
+### DB Set up
+- run the compose.yaml file
+
+`docker-compose up`
+
+- setup the Postgres database
+
+`psql -U postgres`
+
+- Create an user
+
+`CREATE USER examuser WITH PASSWORD 'exampass';`
+- exit the postgres database
+
+`\q`
+- Create a DB
+
+`createdb -U postgres -O examuser exam`
