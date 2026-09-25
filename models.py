@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
+from config import settings
 
 
 class User(Base):
@@ -66,6 +67,8 @@ class Exam(Base):
     def image_path(self) -> str | None:
         if self.image_file:
             return f"/media/exams/{self.image_file}"
+            # if using s3
+            #return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/exam/{self.image_file}"
         return None
     
 class PasswordResetToken(Base):

@@ -41,7 +41,9 @@ app = FastAPI(lifespan=lifespan)
 
 # # create /static url prefix to serve files from the directory
 # app.mount("/static", StaticFiles(directory="static"), name="static")
-# app.mount("/media", StaticFiles(directory="media"), name="media")
+
+# remove this if working with s3
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 # The list tags organizes the documentation in a collapsable secction
 app.include_router(users.router, prefix="/api/users", tags=["users"])

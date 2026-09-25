@@ -28,3 +28,6 @@ The database used is PostgreSQL, the ORM used is SQLAlchemy and alembic as the m
 - Create a DB
 
 `createdb -U postgres -O examuser exam`
+
+## AWS Servecis
+Here I am using the boto3 to access AWS services. The cloud solution will be used to save images nad PDF apart of the project. As this is a learn space **no aws account where created or used**

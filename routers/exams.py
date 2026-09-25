@@ -11,8 +11,22 @@ import models
 from auth import CurrentUser
 from config import settings
 from database import get_db
-from image_utils import delete_image, process_image
-from schemas import ExamResponse, ExamCreate, ExamResponse, ExamUpdate, PaginatedExamsResponse
+from image_utils import (
+    delete_image,
+    save_in_local_files,
+    delete_s3_exam_image,
+    upload_s3_exam_image,
+    save_in_s3
+)
+from schemas import (
+    ExamResponse, 
+    ExamCreate,
+    ExamResponse, 
+    ExamUpdate, 
+    PaginatedExamsResponse
+)
+
+from botocore.exceptions import ClientError
 
 router = APIRouter()
 
@@ -203,6 +217,8 @@ async def delete_exam(
     
     if old_filename:
         delete_image(old_filename)
+        # for s3
+        # await delete_s3_exam_image(old_filename)
 
 
 ######## UPLOADS ##########
@@ -243,12 +259,25 @@ async def upload_exam_image(
         
     try:
         # Wrap the CPU bound process in a thread
-        new_filename = await run_in_threadpool(process_image, content)
+        new_filename = await run_in_threadpool(save_in_local_files, content)
+        # for s3
+        # porecessed_bytes, new_filename = await run_in_threadpool(
+        #     save_in_s3, content
+        # )
     except UnidentifiedImageError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid image file. Plese upload a valid image (JPEG, PNG, GIF, WebP)"
         ) from err
+        
+    ## for s3
+    # try:
+    #     await upload_s3_exam_image(processed_bytes, new_filename)
+    # except ClientError as err:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail="Failed to upload image. Please try again.",
+    #     ) from err
     
     old_filename = exam.image_file
     
@@ -259,6 +288,8 @@ async def upload_exam_image(
     # delete only if the commit succeeds
     if old_filename:
         delete_image(old_filename)
+        # for s3
+        # await delete_s3_exam_image(old_filename)
     
     return current_user
 
@@ -299,5 +330,7 @@ async def delete_exam_image(
     await db.refresh(exam)
     
     delete_image(old_filename)
+    # for s3
+    # await delete_s3_exam_image(old_filename)
     
     return exam
