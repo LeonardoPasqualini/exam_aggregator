@@ -223,7 +223,7 @@ async def delete_exam(
 
 ######## UPLOADS ##########
 
-@router.patch("/{exam.id}/image", response_model=ExamResponse)
+@router.patch("/{exam_id}/image", response_model=ExamResponse)
 async def upload_exam_image(
     exam_id: int,
     file: UploadFile,
@@ -291,7 +291,7 @@ async def upload_exam_image(
         # for s3
         # await delete_s3_exam_image(old_filename)
     
-    return current_user
+    return exam
 
 @router.delete("/{exam_id}/image", response_model=ExamResponse)
 async def delete_exam_image(

@@ -35,7 +35,7 @@ def save_in_local_files(content: bytes) -> str:
     return filename
     
 def delete_image(filename: str | None) -> None:
-    if filename in None:
+    if filename is None:
         return
     
     filepath = IMG_DIR / filename

@@ -113,7 +113,7 @@ async def login_for_access_token(
     if not user or not verify_passoword(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            details="Incorrect email or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"}
         )
         
@@ -131,7 +131,7 @@ async def login_for_access_token(
 async def get_current_user(current_user: CurrentUser):
     return current_user
 
-@router.post("/forgot-passowrd", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
 async def forgot_password(
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
