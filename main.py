@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 # type safe dependecies
 from typing import Annotated
 
-from fastapi import FastAPI, Request, status, Depends
+from fastapi import FastAPI, Request, status, Depends, HTTPException
 from fastapi.exception_handlers import (
     http_exception_handler,
     request_validation_exception_handler,
@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import models
@@ -48,6 +48,40 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 # The list tags organizes the documentation in a collapsable secction
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(exams.router, prefix="/api/exams", tags=["exams"])
+
+# Verify if the db is up
+@app.get("/health")
+async def health_check(db: Annotated[AsyncSession, Depends(get_db)]):
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        ) from exc
+    return {"status": "healthy"}
+
+# probabily not needed now. This project is only an API
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Prevents other sites to embed this in IFrame
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    # Tells the browser to trust the type header 
+    response.headers["X-Contente-Type-Options"] = "nosniff"
+    
+    # set if not set
+    if "Referrer-Policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    # Tells browser to only use https, but skip localhost
+    if request.url.hostname not in ("localhost", "127.0.0.1"):
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=63072000; includeSubDomains"
+        )
+        
+    return response
 
 # Example of a HTMLResponse
 @app.get("/", response_class=HTMLResponse, include_in_schema=False, name="home")
