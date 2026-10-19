@@ -1,13 +1,32 @@
 services:
   db:
+    networks:
+      - app_network
     image: postgres:18
-    container_name: postgres-dev
+    container_name: postgres-db
     environment:
       POSTGRES_PASSWORD: secret
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql~
+
+  app:
+    networks:
+      - app_network
+    image: fastapi-app
+    build: .
+    container_name: exams-app
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
 
 volumes:
   postgres_data:
+
+networks:
+  app_network:
+    driver: bridge

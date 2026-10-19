@@ -28,11 +28,15 @@ class Settings(BaseSettings):
     
     # Mailer config
     mail_server: str = "localhost"
-    mail_port: int = 587 # smtp defaut port for tls
-    mail_username: str = "" # authentication with smtp server
-    mail_password: SecretStr = SecretStr("") # authentication with smtp server
-    mail_form: str = "noreply@exemple.com" # sender addrs
-    mail_use_tls: bool = True #tells aiostmplib it's encripted
+    # smtp defaut port for tls
+    mail_port: int = 587 
+    # authentication with smtp server
+    mail_username: str = ""
+    mail_password: SecretStr = SecretStr("")
+    # sender addrs
+    mail_form: str = "noreply@exemple.com"
+    #tells aiostmplib it's encripted
+    mail_use_tls: bool = True
     
     frontend_url: str = "http://localhost:8000"
     

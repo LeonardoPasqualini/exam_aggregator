@@ -22,7 +22,7 @@ ENV UV_PYTHON_DOWNLOADS=0
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-install-project --no-dev
 
-# Cope app code and install project
+# Copy app code and install project
 COPY . ./
 RUN uv sync --locked --no-dev
 
@@ -46,4 +46,5 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 
 # exec replaces shell so fastapi recives SIGTERM for clean shutdown
-CMD ["/bin/sh", "-c", "exec fastapi run --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips '*'"]
+# CMD ["/bin/sh", "-c", "exec fastapi run --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["/bin/sh", "-c", "exec python -m fastapi run --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips '*'"]

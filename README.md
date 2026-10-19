@@ -1,5 +1,5 @@
 # Introduction
-This repository is made as a way to learn about Python, FastAPI and other libraries. It is a simple API that allows you to create, read, update and delete laboratorial exams like blood works.
+This repository is made as a way to learn about Python, FastAPI and other libraries. It is a simple API that allows you to create, read, update and delete laboratorial exams like blood works. (Front end coming in a future update)
 
 ## For Boot.dev
 As an alumni of [Boot.dev](https://www.boot.dev), I am using this repository to complet the personal project in the Backend path.
@@ -7,14 +7,18 @@ As an alumni of [Boot.dev](https://www.boot.dev), I am using this repository to 
 ## For FastAPI
 This project is based on the [FastAPI](https://fastapi.tiangolo.com/) framework. I am learning this framework by following - with adaptations - the [tutotiral of Corey Schafer](https://www.youtube.com/playlist?list=PL-osiE80TeTsak-c-QsVeg0YYG_0TeyXI) on YouTube.
 
-## Database
-The database used is PostgreSQL, the ORM used is SQLAlchemy and alembic as the migration controller.
-
-### DB Set up
+# SETUP
+- Fill up the .env.example and chage the name to .env
 - run the compose.yaml file
 
 `docker-compose up`
 
+the Home page '/' 
+
+## Database
+The database used is PostgreSQL, the ORM used is SQLAlchemy and alembic as the migration controller.
+
+### DB Set up
 - setup the Postgres database
 
 `psql -U postgres`
@@ -30,4 +34,8 @@ The database used is PostgreSQL, the ORM used is SQLAlchemy and alembic as the m
 `createdb -U postgres -O examuser exam`
 
 ## AWS Servecis
-Here I am using the boto3 to access AWS services. The cloud solution will be used to save images nad PDF apart of the project. As this is a learn space **no aws account where created or used**
+Here I am using the boto3 to access AWS services. The cloud solution will be used to save images nad PDF apart of the project. As this is a learn space. **No aws account where created or used** so only fill the .env file with mocked information.
+
+
+## DOCS
+For the API documentation, go to the /docs.

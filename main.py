@@ -85,16 +85,18 @@ async def add_security_headers(request: Request, call_next):
 
 # Example of a HTMLResponse
 @app.get("/", response_class=HTMLResponse, include_in_schema=False, name="home")
-@app.get("/exams", response_class=HTMLResponse, include_in_schema=False, name="exams")
+# @app.get("/exams", response_class=HTMLResponse, include_in_schema=False, name="exams")
 async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(
-        select(models.Exam).options(selectinload(models.Exam.owner)),
-    )
-    exams = result.scalars().all()
+    # result = await db.execute(
+    #     select(models.Exam).options(selectinload(models.Exam.owner)),
+    # )
+    # exams = result.scalars().all()
     ## fastAPI converts dict in json automaticaly
     # return f"<h1>{exams[0]["name"]}</h1>"
     
-    return exams
+    return JSONResponse(
+                content={"detail": "go to /docs for documentation"},
+            )
 
 ############################################################
 #################### Exception handlers ####################
